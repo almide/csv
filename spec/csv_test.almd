@@ -4,143 +4,141 @@ import json
 
 fn unwrap(r: Result[Value, String]) -> Value = match r {
   ok(v) => v,
-  err(e) => { println("ERROR: ${e}"); value.null() },
+  err(e) => {
+    println("ERROR: ${e}");
+    value.null()
+  },
 }
 
 fn row_count(v: Value) -> Int = list.len(value.as_array(v) ?? [])
 
 fn cell(v: Value, row: Int, col: Int) -> String = {
-  let rows = value.as_array(v) ?? []
-  let r = value.as_array(list.get(rows, row) ?? value.array([])) ?? []
+  let rows = value.as_array(v) ?? [];
+  let r = value.as_array(list.get(rows, row) ?? value.array([])) ?? [];
   value.as_string(list.get(r, col) ?? value.null()) ?? ""
 }
 
 fn field(v: Value, row: Int, key: String) -> String = {
-  let rows = value.as_array(v) ?? []
-  let obj = list.get(rows, row) ?? value.object([])
+  let rows = value.as_array(v) ?? [];
+  let obj = list.get(rows, row) ?? value.object([]);
   value.as_string(value.get(obj, key) ?? value.null()) ?? ""
 }
 
 // ═══════════════════════════════════════════════════════
 // Parse: basic
 // ═══════════════════════════════════════════════════════
-
 test "parse simple" {
-  let v = unwrap(csv.parse("a,b,c\n1,2,3"))
-  assert_eq(row_count(v), 2)
-  assert_eq(cell(v, 0, 0), "a")
+  let v = unwrap(csv.parse("a,b,c\n1,2,3"));
+  assert_eq(row_count(v), 2);
+  assert_eq(cell(v, 0, 0), "a");
   assert_eq(cell(v, 1, 2), "3")
 }
 
 test "parse single row" {
-  let v = unwrap(csv.parse("hello,world"))
-  assert_eq(row_count(v), 1)
-  assert_eq(cell(v, 0, 0), "hello")
+  let v = unwrap(csv.parse("hello,world"));
+  assert_eq(row_count(v), 1);
+  assert_eq(cell(v, 0, 0), "hello");
   assert_eq(cell(v, 0, 1), "world")
 }
 
 test "parse empty" {
-  let v = unwrap(csv.parse(""))
+  let v = unwrap(csv.parse(""));
   assert_eq(row_count(v), 0)
 }
 
 test "parse trailing newline" {
-  let v = unwrap(csv.parse("a,b\n1,2\n"))
+  let v = unwrap(csv.parse("a,b\n1,2\n"));
   assert_eq(row_count(v), 2)
 }
 
 test "parse crlf" {
-  let v = unwrap(csv.parse("a,b\r\n1,2"))
-  assert_eq(row_count(v), 2)
+  let v = unwrap(csv.parse("a,b\r\n1,2"));
+  assert_eq(row_count(v), 2);
   assert_eq(cell(v, 1, 0), "1")
 }
 
 // ═══════════════════════════════════════════════════════
 // Parse: quoted fields
 // ═══════════════════════════════════════════════════════
-
 test "parse quoted field" {
-  let v = unwrap(csv.parse("\"hello, world\",b"))
+  let v = unwrap(csv.parse('"hello, world",b'));
   assert_eq(cell(v, 0, 0), "hello, world")
 }
 
 test "parse escaped quote" {
-  let v = unwrap(csv.parse("\"say \"\"hi\"\"\",b"))
-  assert_eq(cell(v, 0, 0), "say \"hi\"")
+  let v = unwrap(csv.parse('"say ""hi""",b'));
+  assert_eq(cell(v, 0, 0), 'say "hi"')
 }
 
 test "parse quoted newline" {
-  let v = unwrap(csv.parse("\"line1\nline2\",b"))
+  let v = unwrap(csv.parse('"line1\nline2",b'));
   assert_eq(cell(v, 0, 0), "line1\nline2")
 }
 
 test "parse empty quoted field" {
-  let v = unwrap(csv.parse("\"\",b"))
+  let v = unwrap(csv.parse('"",b'));
   assert_eq(cell(v, 0, 0), "")
 }
 
 // ═══════════════════════════════════════════════════════
 // Parse: records (header row)
 // ═══════════════════════════════════════════════════════
-
 test "parse_records basic" {
-  let v = unwrap(csv.parse_records("name,age\nAlice,30\nBob,25"))
-  assert_eq(row_count(v), 2)
-  assert_eq(field(v, 0, "name"), "Alice")
-  assert_eq(field(v, 0, "age"), "30")
+  let v = unwrap(csv.parse_records("name,age\nAlice,30\nBob,25"));
+  assert_eq(row_count(v), 2);
+  assert_eq(field(v, 0, "name"), "Alice");
+  assert_eq(field(v, 0, "age"), "30");
   assert_eq(field(v, 1, "name"), "Bob")
 }
 
 test "parse_records empty body" {
-  let v = unwrap(csv.parse_records("name,age"))
+  let v = unwrap(csv.parse_records("name,age"));
   assert_eq(row_count(v), 0)
 }
 
 test "parse_records empty input" {
-  let v = unwrap(csv.parse_records(""))
+  let v = unwrap(csv.parse_records(""));
   assert_eq(row_count(v), 0)
 }
 
 // ═══════════════════════════════════════════════════════
 // Stringify
 // ═══════════════════════════════════════════════════════
-
 test "stringify simple" {
   let v = value.array([
     value.array([value.str("a"), value.str("b")]),
-    value.array([value.str("1"), value.str("2")]),
-  ])
+    value.array([value.str("1"), value.str("2")])
+  ]);
   assert_eq(csv.stringify(v), "a,b\n1,2")
 }
 
 test "stringify escapes comma" {
   let v = value.array([
-    value.array([value.str("hello, world"), value.str("ok")]),
-  ])
-  let result = csv.stringify(v)
-  assert(string.contains(result, "\"hello, world\""))
+    value.array([value.str("hello, world"), value.str("ok")])
+  ]);
+  let result = csv.stringify(v);
+  assert(string.contains(result, '"hello, world"'))
 }
 
 test "stringify escapes quotes" {
   let v = value.array([
-    value.array([value.str("say \"hi\""), value.str("ok")]),
-  ])
-  let result = csv.stringify(v)
-  assert(string.contains(result, "\"say \"\"hi\"\"\""))
+    value.array([value.str('say "hi"'), value.str("ok")])
+  ]);
+  let result = csv.stringify(v);
+  assert(string.contains(result, '"say ""hi"""'))
 }
 
 // ═══════════════════════════════════════════════════════
 // Stringify records
 // ═══════════════════════════════════════════════════════
-
 test "stringify_records" {
   let v = value.array([
     value.object([("name", value.str("Alice")), ("age", value.str("30"))]),
-    value.object([("name", value.str("Bob")), ("age", value.str("25"))]),
-  ])
-  let result = csv.stringify_records(v)
-  assert(string.contains(result, "name,age"))
-  assert(string.contains(result, "Alice,30"))
+    value.object([("name", value.str("Bob")), ("age", value.str("25"))])
+  ]);
+  let result = csv.stringify_records(v);
+  assert(string.contains(result, "name,age"));
+  assert(string.contains(result, "Alice,30"));
   assert(string.contains(result, "Bob,25"))
 }
 
@@ -151,41 +149,39 @@ test "stringify_records empty" {
 // ═══════════════════════════════════════════════════════
 // Roundtrip
 // ═══════════════════════════════════════════════════════
-
 test "roundtrip simple" {
-  let original = "a,b,c\n1,2,3"
-  let v = unwrap(csv.parse(original))
+  let original = "a,b,c\n1,2,3";
+  let v = unwrap(csv.parse(original));
   assert_eq(csv.stringify(v), original)
 }
 
 test "roundtrip records" {
-  let text = "name,age\nAlice,30\nBob,25"
-  let records = unwrap(csv.parse_records(text))
-  let result = csv.stringify_records(records)
-  assert(string.contains(result, "name,age"))
+  let text = "name,age\nAlice,30\nBob,25";
+  let records = unwrap(csv.parse_records(text));
+  let result = csv.stringify_records(records);
+  assert(string.contains(result, "name,age"));
   assert(string.contains(result, "Alice,30"))
 }
 
 test "roundtrip quoted" {
-  let original = "\"a,b\",c\n1,2"
-  let v = unwrap(csv.parse(original))
-  let result = csv.stringify(v)
-  assert(string.contains(result, "\"a,b\""))
+  let original = '"a,b",c\n1,2';
+  let v = unwrap(csv.parse(original));
+  let result = csv.stringify(v);
+  assert(string.contains(result, '"a,b"'))
 }
 
 // ═══════════════════════════════════════════════════════
 // Edge cases
 // ═══════════════════════════════════════════════════════
-
 test "parse empty fields" {
-  let v = unwrap(csv.parse(",b,\n,,"))
-  assert_eq(cell(v, 0, 0), "")
-  assert_eq(cell(v, 0, 2), "")
+  let v = unwrap(csv.parse(",b,\n,,"));
+  assert_eq(cell(v, 0, 0), "");
+  assert_eq(cell(v, 0, 2), "");
   assert_eq(cell(v, 1, 1), "")
 }
 
 test "parse single value" {
-  let v = unwrap(csv.parse("hello"))
-  assert_eq(row_count(v), 1)
+  let v = unwrap(csv.parse("hello"));
+  assert_eq(row_count(v), 1);
   assert_eq(cell(v, 0, 0), "hello")
 }
