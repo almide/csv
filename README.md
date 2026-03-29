@@ -5,7 +5,7 @@ CSV parser and serializer for [Almide](https://github.com/almide/almide). Pure A
 ## Install
 
 ```bash
-almide add csv
+almide add almide/csv
 ```
 
 ## Usage
