@@ -1,0 +1,124 @@
+// almide/csv — CSV parser and serializer for Almide
+//
+// Codec-compatible via parse/stringify for the Codec protocol.
+//
+//   csv.parse(text)                  → Value (array of arrays)
+//   csv.parse_records(text)          → Value (array of objects, first row = header)
+//   csv.stringify(v)                 → String
+//   csv.encode(records)              → String (Codec: list of records → CSV)
+
+// ── Public API ──────────────────────────────────────
+
+effect fn parse(text: String) -> Result[Value, String] = {
+  let rows = parse_rows(text)
+  ok(value.array(rows |> list.map((row) => value.array(row |> list.map((cell) => value.str(cell))))))
+}
+
+fn stringify(v: Value) -> String = {
+  let rows = value.as_array(v) ?? []
+  rows
+    |> list.map((row) => {
+      let cells = value.as_array(row) ?? []
+      cells |> list.map((cell) => escape_cell(value.as_string(cell) ?? value.stringify(cell))) |> list.join(",")
+    })
+    |> list.join("\n")
+}
+
+effect fn parse_records(text: String) -> Result[Value, String] = {
+  let rows = parse_rows(text)
+  guard list.len(rows) > 0 else ok(value.array([]))
+  let header = list.get(rows, 0) ?? []
+  let data = list.drop(rows, 1)
+  let objects = data |> list.map((row) => {
+    let pairs = header
+      |> list.enumerate
+      |> list.map((entry) => {
+        let (i, key) = entry
+        (key, value.str(list.get_or(row, i, "")))
+      })
+    value.object(pairs)
+  })
+  ok(value.array(objects))
+}
+
+fn stringify_records(v: Value) -> String = {
+  let rows = value.as_array(v) ?? []
+  if list.is_empty(rows) then ""
+  else {
+    let first = list.get(rows, 0) ?? value.object([])
+    let header = json.keys(first)
+    let header_line = header |> list.map((h) => escape_cell(h)) |> list.join(",")
+    let data_lines = rows |> list.map((row) => {
+      header |> list.map((h) => escape_cell(value.as_string(value.get(row, h) ?? value.null()) ?? "")) |> list.join(",")
+    })
+    ([header_line] + data_lines) |> list.join("\n")
+  }
+}
+
+// ── CSV Parsing ─────────────────────────────────────
+
+local fn parse_rows(text: String) -> List[List[String]] = {
+  let trimmed = string.trim_end(text)
+  if string.is_empty(trimmed) then []
+  else parse_rows_rec(trimmed, 0, [], [])
+}
+
+local fn parse_rows_rec(text: String, pos: Int, rows: List[List[String]], current_row: List[String]) -> List[List[String]] = {
+  if pos >= string.len(text) then rows + [current_row]
+  else {
+    let c = string.get(text, pos) ?? ""
+    if c == "\"" then {
+      let (field, np) = parse_quoted_field(text, pos + 1, "")
+      parse_after_field(text, np, rows, current_row + [field])
+    }
+    else if c == "," then parse_rows_rec(text, pos + 1, rows, current_row + [""])
+    else if c == "\n" then parse_rows_rec(text, pos + 1, rows + [current_row], [])
+    else if c == "\r" and (string.get(text, pos + 1) ?? "") == "\n" then parse_rows_rec(text, pos + 2, rows + [current_row], [])
+    else if c == "\r" then parse_rows_rec(text, pos + 1, rows + [current_row], [])
+    else {
+      let (field, np) = parse_unquoted_field(text, pos, "")
+      parse_after_field(text, np, rows, current_row + [field])
+    }
+  }
+}
+
+local fn parse_after_field(text: String, pos: Int, rows: List[List[String]], current_row: List[String]) -> List[List[String]] = {
+  if pos >= string.len(text) then rows + [current_row]
+  else {
+    let c = string.get(text, pos) ?? ""
+    if c == "," then parse_rows_rec(text, pos + 1, rows, current_row)
+    else if c == "\n" then parse_rows_rec(text, pos + 1, rows + [current_row], [])
+    else if c == "\r" and (string.get(text, pos + 1) ?? "") == "\n" then parse_rows_rec(text, pos + 2, rows + [current_row], [])
+    else if c == "\r" then parse_rows_rec(text, pos + 1, rows + [current_row], [])
+    else parse_rows_rec(text, pos, rows, current_row)
+  }
+}
+
+local fn parse_unquoted_field(text: String, pos: Int, acc: String) -> (String, Int) = {
+  if pos >= string.len(text) then (acc, pos)
+  else {
+    let c = string.get(text, pos) ?? ""
+    if c == "," or c == "\n" or c == "\r" then (acc, pos)
+    else parse_unquoted_field(text, pos + 1, acc + c)
+  }
+}
+
+local fn parse_quoted_field(text: String, pos: Int, acc: String) -> (String, Int) = {
+  if pos >= string.len(text) then (acc, pos)
+  else {
+    let c = string.get(text, pos) ?? ""
+    if c == "\"" then {
+      if (string.get(text, pos + 1) ?? "") == "\"" then parse_quoted_field(text, pos + 2, acc + "\"")
+      else (acc, pos + 1)
+    }
+    else parse_quoted_field(text, pos + 1, acc + c)
+  }
+}
+
+// ── CSV Serialization ───────────────────────────────
+
+local fn escape_cell(s: String) -> String = {
+  if string.contains(s, ",") or string.contains(s, "\"") or string.contains(s, "\n") then
+    "\"${string.replace(s, "\"", "\"\"")}\""
+  else s
+}
