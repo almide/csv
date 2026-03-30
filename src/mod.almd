@@ -1,3 +1,5 @@
+import json
+
 // almide/csv — CSV parser and serializer for Almide
 //
 // Codec-compatible via parse/stringify for the Codec protocol.
