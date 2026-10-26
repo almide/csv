@@ -105,15 +105,15 @@ test "parse_records empty input" {
 // ═══════════════════════════════════════════════════════
 test "stringify simple" {
   let v = value.array([
-    value.array([value.str("a"), value.str("b")]),
-    value.array([value.str("1"), value.str("2")])
+    value.array([value.string("a"), value.string("b")]),
+    value.array([value.string("1"), value.string("2")])
   ]);
   assert_eq(csv.stringify(v), "a,b\n1,2")
 }
 
 test "stringify escapes comma" {
   let v = value.array([
-    value.array([value.str("hello, world"), value.str("ok")])
+    value.array([value.string("hello, world"), value.string("ok")])
   ]);
   let result = csv.stringify(v);
   assert(string.contains(result, '"hello, world"'))
@@ -121,7 +121,7 @@ test "stringify escapes comma" {
 
 test "stringify escapes quotes" {
   let v = value.array([
-    value.array([value.str('say "hi"'), value.str("ok")])
+    value.array([value.string('say "hi"'), value.string("ok")])
   ]);
   let result = csv.stringify(v);
   assert(string.contains(result, '"say ""hi"""'))
@@ -132,8 +132,8 @@ test "stringify escapes quotes" {
 // ═══════════════════════════════════════════════════════
 test "stringify_records" {
   let v = value.array([
-    value.object([("name", value.str("Alice")), ("age", value.str("30"))]),
-    value.object([("name", value.str("Bob")), ("age", value.str("25"))])
+    value.object([("name", value.string("Alice")), ("age", value.string("30"))]),
+    value.object([("name", value.string("Bob")), ("age", value.string("25"))])
   ]);
   let result = csv.stringify_records(v);
   assert(string.contains(result, "name,age"));
